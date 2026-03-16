@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#333333">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>自動売買</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f5f5;
+    color: #333;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .container {
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  h1 {
+    text-align: center;
+    font-size: 1.5rem;
+    margin-bottom: 8px;
+  }
+  .date {
+    text-align: center;
+    font-size: 1.1rem;
+    color: #666;
+    margin-bottom: 24px;
+  }
+  .time-block {
+    border: 2px solid #ddd;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+  .time-block.morning { border-color: #ff9800; }
+  .time-block.night { border-color: #5c6bc0; }
+  .time-label {
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+  }
+  .time-block.morning .time-label { color: #e65100; }
+  .time-block.night .time-label { color: #283593; }
+  .section {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  .btn-group {
+    display: flex;
+    gap: 8px;
+  }
+  .btn-group button {
+    flex: 1;
+    padding: 12px 0;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-group button:active { transform: scale(0.96); }
+  .btn-group button.sell { color: #e53935; border-color: #e53935; }
+  .btn-group button.sell.selected { background: #e53935; color: #fff; }
+  .btn-group button.buy { color: #1e88e5; border-color: #1e88e5; }
+  .btn-group button.buy.selected { background: #1e88e5; color: #fff; }
+  .btn-group button.none { color: #757575; border-color: #757575; }
+  .btn-group button.none.selected { background: #757575; color: #fff; }
+  .submit-btn {
+    display: block;
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 4px;
+    transition: background 0.15s;
+  }
+  .submit-btn:disabled { background: #aaa !important; cursor: not-allowed; }
+  .submit-btn.morning { background: #ef6c00; }
+  .submit-btn.morning:hover:not(:disabled) { background: #e65100; }
+  .submit-btn.night { background: #3949ab; }
+  .submit-btn.night:hover:not(:disabled) { background: #283593; }
+  .message {
+    text-align: center;
+    margin-top: 10px;
+    margin-bottom: 4px;
+    font-size: 0.95rem;
+    min-height: 1.4em;
+  }
+  .message.success { color: #43a047; }
+  .message.error { color: #e53935; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>自動売買</h1>
+  <div class="date" id="today"></div>
+
+  <!-- 朝セクション -->
+  <div class="time-block morning">
+    <div class="time-label">朝の入力</div>
+
+    <div class="section">
+      <div class="section-title">シリウス デイセッション</div>
+      <div class="btn-group" data-key="sirius_day">
+        <button class="sell" onclick="sel(this,'売り')">売り</button>
+        <button class="buy" onclick="sel(this,'買い')">買い</button>
+        <button class="none" onclick="sel(this,'ノートレ')">ノートレ</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">ベガ</div>
+      <div class="btn-group" data-key="vega">
+        <button class="sell" onclick="sel(this,'売り')">売り</button>
+        <button class="buy" onclick="sel(this,'買い')">買い</button>
+        <button class="none" onclick="sel(this,'ノートレ')">ノートレ</button>
+      </div>
+    </div>
+
+    <button class="submit-btn morning" id="btnMorning" onclick="submit('morning')">朝の記録をする</button>
+    <div class="message" id="msgMorning"></div>
+  </div>
+
+  <!-- 夜セクション -->
+  <div class="time-block night">
+    <div class="time-label">夜の入力</div>
+
+    <div class="section">
+      <div class="section-title">シリウス ナイトセッション</div>
+      <div class="btn-group" data-key="sirius_night">
+        <button class="sell" onclick="sel(this,'売り')">売り</button>
+        <button class="buy" onclick="sel(this,'買い')">買い</button>
+        <button class="none" onclick="sel(this,'ノートレ')">ノートレ</button>
+      </div>
+    </div>
+
+    <button class="submit-btn night" id="btnNight" onclick="submit('night')">夜の記録をする</button>
+    <div class="message" id="msgNight"></div>
+  </div>
+</div>
+
+<script>
+const URL = 'https://script.google.com/macros/s/AKfycby7nloQp6dPwzeA8C2ZyEt_FT_Jz89nS1WBk0D-HrNo3zV04Zny2FnX58A-W2evQFPs/exec';
+const choices = {};
+
+const now = new Date();
+const dateStr = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()}`;
+document.getElementById('today').textContent = dateStr;
+
+function sel(btn, value) {
+  const group = btn.parentElement;
+  group.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  choices[group.dataset.key] = value;
+}
+
+async function submit(time) {
+  const msgEl = document.getElementById(time === 'morning' ? 'msgMorning' : 'msgNight');
+  const btnEl = document.getElementById(time === 'morning' ? 'btnMorning' : 'btnNight');
+
+  let payload, requiredKeys, label;
+  if (time === 'morning') {
+    requiredKeys = ['sirius_day', 'vega'];
+    label = '朝の記録をする';
+    payload = { date: dateStr, session: 'morning', sirius_day: choices.sirius_day, vega: choices.vega };
+  } else {
+    requiredKeys = ['sirius_night'];
+    label = '夜の記録をする';
+    payload = { date: dateStr, session: 'night', sirius_night: choices.sirius_night };
+  }
+
+  if (requiredKeys.some(k => !choices[k])) {
+    showMsg(msgEl, 'すべての項目を選択してください', 'error');
+    return;
+  }
+
+  btnEl.disabled = true;
+  btnEl.textContent = '送信中...';
+  showMsg(msgEl, '', '');
+
+  try {
+    await fetch(URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    showMsg(msgEl, '記録しました！', 'success');
+  } catch (e) {
+    showMsg(msgEl, '送信に失敗しました。もう一度お試しください。', 'error');
+  }
+  btnEl.disabled = false;
+  btnEl.textContent = label;
+}
+
+function showMsg(el, text, type) {
+  el.textContent = text;
+  el.className = 'message ' + type;
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+</script>
+</body>
+</html>
