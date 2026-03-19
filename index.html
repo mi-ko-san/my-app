@@ -112,6 +112,47 @@
   }
   .message.success { color: #43a047; }
   .message.error { color: #e53935; }
+
+  /* 履歴セクション */
+  .history-block {
+    border: 2px solid #ddd;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+  .history-label {
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+    color: #333;
+  }
+  .history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  .history-table th {
+    background: #eee;
+    padding: 8px 4px;
+    text-align: center;
+    font-weight: 600;
+  }
+  .history-table td {
+    padding: 8px 4px;
+    text-align: center;
+    border-bottom: 1px solid #eee;
+  }
+  .history-table .val-sell { color: #e53935; font-weight: 600; }
+  .history-table .val-buy { color: #1e88e5; font-weight: 600; }
+  .history-table .val-none { color: #999; }
+  .history-empty {
+    text-align: center;
+    color: #999;
+    padding: 16px;
+  }
 </style>
 </head>
 <body>
@@ -161,21 +202,95 @@
     <button class="submit-btn night" id="btnNight" onclick="submit('night')">夜の記録をする</button>
     <div class="message" id="msgNight"></div>
   </div>
+
+  <!-- 履歴セクション -->
+  <div class="history-block">
+    <div class="history-label">記録の履歴</div>
+    <div id="historyContent">
+      <div class="history-empty">まだ記録がありません</div>
+    </div>
+  </div>
 </div>
 
 <script>
-const URL = 'https://script.google.com/macros/s/AKfycby7nloQp6dPwzeA8C2ZyEt_FT_Jz89nS1WBk0D-HrNo3zV04Zny2FnX58A-W2evQFPs/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycby7nloQp6dPwzeA8C2ZyEt_FT_Jz89nS1WBk0D-HrNo3zV04Zny2FnX58A-W2evQFPs/exec';
 const choices = {};
 
-const now = new Date();
-const dateStr = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()}`;
-document.getElementById('today').textContent = dateStr;
+function getDateStr() {
+  const now = new Date();
+  return now.getFullYear() + '/' + (now.getMonth() + 1) + '/' + now.getDate();
+}
+
+// 日付を表示＆1分ごとに自動更新
+var currentDateStr = getDateStr();
+document.getElementById('today').textContent = currentDateStr;
+setInterval(function() {
+  var newDate = getDateStr();
+  if (newDate !== currentDateStr) {
+    currentDateStr = newDate;
+    document.getElementById('today').textContent = currentDateStr;
+  }
+}, 60000);
 
 function sel(btn, value) {
   const group = btn.parentElement;
   group.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
   choices[group.dataset.key] = value;
+}
+
+// 履歴をスマホに保存・表示
+function saveHistory(date, data) {
+  var history = JSON.parse(localStorage.getItem('tradeHistory') || '[]');
+  // 同じ日付の行をさがす
+  var found = false;
+  for (var i = 0; i < history.length; i++) {
+    if (history[i].date === date) {
+      Object.assign(history[i], data);
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    var row = { date: date };
+    Object.assign(row, data);
+    history.push(row);
+  }
+  localStorage.setItem('tradeHistory', JSON.stringify(history));
+  renderHistory();
+}
+
+function valClass(v) {
+  if (v === '売り') return 'val-sell';
+  if (v === '買い') return 'val-buy';
+  return 'val-none';
+}
+
+function renderHistory() {
+  var history = JSON.parse(localStorage.getItem('tradeHistory') || '[]');
+  var el = document.getElementById('historyContent');
+  if (history.length === 0) {
+    el.innerHTML = '<div class="history-empty">まだ記録がありません</div>';
+    return;
+  }
+  // 新しい順に表示
+  var rows = history.slice().reverse();
+  var html = '<table class="history-table">';
+  html += '<tr><th>日付</th><th>シリウス<br>デイ</th><th>ベガ</th><th>シリウス<br>ナイト</th></tr>';
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var sd = r.sirius_day || '-';
+    var vg = r.vega || '-';
+    var sn = r.sirius_night || '-';
+    html += '<tr>';
+    html += '<td>' + r.date + '</td>';
+    html += '<td class="' + valClass(sd) + '">' + sd + '</td>';
+    html += '<td class="' + valClass(vg) + '">' + vg + '</td>';
+    html += '<td class="' + valClass(sn) + '">' + sn + '</td>';
+    html += '</tr>';
+  }
+  html += '</table>';
+  el.innerHTML = html;
 }
 
 async function submit(time) {
@@ -186,11 +301,11 @@ async function submit(time) {
   if (time === 'morning') {
     requiredKeys = ['sirius_day', 'vega'];
     label = '朝の記録をする';
-    payload = { date: dateStr, session: 'morning', sirius_day: choices.sirius_day, vega: choices.vega };
+    payload = { date: currentDateStr, session: 'morning', sirius_day: choices.sirius_day, vega: choices.vega };
   } else {
     requiredKeys = ['sirius_night'];
     label = '夜の記録をする';
-    payload = { date: dateStr, session: 'night', sirius_night: choices.sirius_night };
+    payload = { date: currentDateStr, session: 'night', sirius_night: choices.sirius_night };
   }
 
   if (requiredKeys.some(k => !choices[k])) {
@@ -203,12 +318,21 @@ async function submit(time) {
   showMsg(msgEl, '', '');
 
   try {
-    await fetch(URL, {
+    await fetch(API_URL, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+    // 履歴に保存
+    var histData = {};
+    if (time === 'morning') {
+      histData.sirius_day = choices.sirius_day;
+      histData.vega = choices.vega;
+    } else {
+      histData.sirius_night = choices.sirius_night;
+    }
+    saveHistory(currentDateStr, histData);
     showMsg(msgEl, '記録しました！', 'success');
   } catch (e) {
     showMsg(msgEl, '送信に失敗しました。もう一度お試しください。', 'error');
@@ -221,6 +345,9 @@ function showMsg(el, text, type) {
   el.textContent = text;
   el.className = 'message ' + type;
 }
+
+// 起動時に履歴を表示
+renderHistory();
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js');
